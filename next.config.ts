@@ -1,7 +1,22 @@
-import type { NextConfig } from "next";
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    turbo: {
+      rules: {
+        '*.svg': {
+          loaders: ['@svgr/webpack'],
+          as: '*.js',
+        },
+      },
+    },
+  },
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb',
+    },
+  },
+  // Configuración adicional para manejar archivos grandes
+  serverExternalPackages: ['formidable'],
+}
 
-const nextConfig: NextConfig = {
-  /* config options here */
-};
-
-export default nextConfig;
+module.exports = nextConfig
