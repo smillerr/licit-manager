@@ -1,17 +1,20 @@
-// Mock para fs - versión simplificada y compatible
-const fs = jest.requireActual('fs');
+// jest.setup.js - Versión corregida
 
-jest.mock('fs', () => ({
-  ...fs,
-  promises: {
-    ...fs.promises,
-  },
-}));
+// Mock para fs - versión simplificada sin variables externas
+jest.mock('fs', () => {
+  const originalFs = jest.requireActual('fs');
+  return {
+    ...originalFs,
+    promises: {
+      ...originalFs.promises,
+    },
+  };
+});
 
-// Mock para path si es necesario
+// Mock para path
 jest.mock('path', () => jest.requireActual('path'));
 
-// Mock para pdfjs-dist para evitar problemas en tests
+// Mock básico para pdfjs-dist
 jest.mock('pdfjs-dist', () => ({
   getDocument: jest.fn(() => ({
     promise: Promise.resolve({
@@ -20,7 +23,8 @@ jest.mock('pdfjs-dist', () => ({
         getTextContent: jest.fn(() => Promise.resolve({
           items: [{ str: 'Texto de prueba del PDF' }]
         }))
-      }))
+      })),
+      destroy: jest.fn()
     })
   })),
   GlobalWorkerOptions: {
@@ -28,7 +32,7 @@ jest.mock('pdfjs-dist', () => ({
   }
 }));
 
-// Mock para pdf-parse si lo estás usando
+// Mock para pdf-parse
 jest.mock('pdf-parse', () => 
   jest.fn(() => Promise.resolve({
     text: 'Texto extraído del PDF mock',
