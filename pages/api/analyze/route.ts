@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 interface AnalysisResponse {
-  analysis: string;
+  analysis?: string;
   error?: string;
 }
 
@@ -18,7 +18,6 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalysisRespo
 
     console.log('📝 Texto recibido para análisis:', text.length, 'caracteres');
 
-    // Análisis simple sin OpenAI (como fallback)
     const wordCount = text.split(/\s+/).length;
     const sentenceCount = text.split(/[.!?]+/).length - 1;
     const paragraphCount = text.split(/\n\s*\n/).length;
@@ -30,9 +29,6 @@ export async function POST(req: NextRequest): Promise<NextResponse<AnalysisRespo
 - 🔤 ${text.length} caracteres
 - 📄 ${paragraphCount} párrafos
 - 💬 ${sentenceCount} oraciones
-
-**Resumen automático:**
-Este documento contiene texto extraído de un PDF. Para un análisis más detallado de los requisitos y puntos clave, se recomienda configurar una API key de OpenAI en el archivo .env.local
 
 **Primeras 200 caracteres:**
 "${text.substring(0, 200)}..."`;
