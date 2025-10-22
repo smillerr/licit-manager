@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-export async function processPdf(filePath) {
+export async function processPdf(filePath: string): Promise<string> {
   console.log('📄 Procesando PDF:', path.basename(filePath));
   
   if (!filePath || !fs.existsSync(filePath)) {
@@ -19,7 +19,7 @@ export async function processPdf(filePath) {
 }
 
 // ... el resto del código se mantiene igual ...
-async function extractWithPdfJsDist(buffer) {
+async function extractWithPdfJsDist(buffer: Buffer): Promise<string> {
   try {
     let pdfjsLib;
     
@@ -65,15 +65,15 @@ async function extractWithPdfJsDist(buffer) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         const pageText = textContent.items
-          .map(item => item.str)
-          .filter(str => str.trim().length > 0)
+          .map((item: any) => item.str)
+          .filter((str: string) => str.trim().length > 0)
           .join(' ');
         
         if (pageText.trim().length > 0) {
           fullText += pageText + '\n';
         }
       } catch (pageError) {
-        console.warn(`Error en página ${i}:`, pageError.message);
+        console.warn(`Error en página ${i}:`, (pageError as Error).message);
       }
     }
     
@@ -88,11 +88,11 @@ async function extractWithPdfJsDist(buffer) {
     
   } catch (error) {
     console.error('Error procesando PDF:', error);
-    throw new Error('Error al procesar el PDF: ' + error.message);
+    throw new Error('Error al procesar el PDF: ' + (error as Error).message);
   }
 }
 
-export const validatePdf = (pdfBuffer) => {
+export const validatePdf = (pdfBuffer: Buffer): boolean => {
   if (!pdfBuffer || pdfBuffer.length === 0) {
     throw new Error('PDF vacío o inválido');
   }
@@ -104,7 +104,7 @@ export const validatePdf = (pdfBuffer) => {
   return true;
 };
 
-function cleanExtractedText(text) {
+function cleanExtractedText(text: string): string {
   if (!text) return '';
   
   return text

@@ -4,16 +4,39 @@
 
 // ========== Mocks globales (se hoistean) ==========
 
+interface MockFile {
+  filepath: string;
+  originalFilename?: string;
+  mimetype?: string;
+  size: number;
+  path?: string;
+}
+
+interface MockRequest {
+  method: string;
+  _simulateParseError?: boolean;
+  _simulateFileSizeError?: boolean;
+  _simulateNoFile?: boolean;
+  _simulateInvalidFile?: boolean;
+  _simulateValidPdf?: boolean;
+}
+
+interface MockResponse {
+  status: jest.Mock<MockResponse>;
+  json: jest.Mock<MockResponse>;
+  setHeader: jest.Mock<MockResponse>;
+}
+
 // Mock de formidable (incluye originalFilename)
 jest.mock('formidable', () => {
   return jest.fn().mockImplementation(() => {
     return {
-      parse: jest.fn((req, callback) => {
+      parse: jest.fn((req: MockRequest, callback: (err: Error | null, fields: any, files: any) => void) => {
         if (req._simulateParseError) {
           callback(new Error('Parse error'), null, null);
         } else if (req._simulateFileSizeError) {
           const error = new Error('File size too large');
-          error.code = 'LIMIT_FILE_SIZE';
+          (error as any).code = 'LIMIT_FILE_SIZE';
           callback(error, null, null);
         } else if (req._simulateNoFile) {
           callback(null, {}, {});
@@ -24,7 +47,7 @@ jest.mock('formidable', () => {
               originalFilename: 'invalid.txt',
               mimetype: 'text/plain',
               size: 1024,
-            },
+            } as MockFile,
           });
         } else if (req._simulateValidPdf) {
           callback(null, {}, {
@@ -33,7 +56,7 @@ jest.mock('formidable', () => {
               originalFilename: 'valid.pdf',
               mimetype: 'application/pdf',
               size: 1024,
-            },
+            } as MockFile,
           });
         } else {
           // Por defecto: válido
@@ -43,7 +66,7 @@ jest.mock('formidable', () => {
               originalFilename: 'test.pdf',
               mimetype: 'application/pdf',
               size: 1024,
-            },
+            } as MockFile,
           });
         }
       }),
@@ -62,7 +85,7 @@ jest.mock('fs', () => {
 
     // Validación de firma y tamaño
     openSync: jest.fn(() => FAKE_FD),
-    readSync: jest.fn((fd, buffer) => {
+    readSync: jest.fn((fd: number, buffer: Buffer) => {
       Buffer.from('%PDF-').copy(buffer, 0);
       return 5; // bytes leídos
     }),
@@ -94,20 +117,21 @@ jest.mock('fs/promises', () => {
 });
 
 // Mock del servicio PDF (evitamos pdfjs-dist en test)
-jest.mock('../lib/pdfService', () => ({
+jest.mock('../../lib/pdfService', () => ({
   processPdf: jest.fn(),
 }));
 
 // ========== Imports DESPUÉS de mocks ==========
-const mod = require('../pages/api/extract');
+const mod = require('../../pages/api/extract');
 const handler = mod.default || mod;
-const { processPdf } = require('../lib/pdfService');
+const { processPdf } = require('../../lib/pdfService');
 
 jest.setTimeout(30000);
 
 // ========== Tests ==========
 describe('API /api/extract PDF Handler', () => {
-  let req, res;
+  let req: MockRequest;
+  let res: MockResponse;
 
   beforeEach(() => {
     req = {
@@ -122,7 +146,7 @@ describe('API /api/extract PDF Handler', () => {
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis(),
-      setHeader: jest.fn(),
+      setHeader: jest.fn().mockReturnThis(),
     };
 
     jest.clearAllMocks();
@@ -172,7 +196,7 @@ describe('API /api/extract PDF Handler', () => {
 
   it('debe procesar PDF válido correctamente', async () => {
     req._simulateValidPdf = true;
-    processPdf.mockResolvedValue('Texto extraído del PDF');
+    (processPdf as jest.Mock).mockResolvedValue('Texto extraído del PDF');
 
     await handler(req, res);
 
@@ -193,7 +217,7 @@ describe('API /api/extract PDF Handler', () => {
 
   it('debe manejar errores en processPdf', async () => {
     req._simulateValidPdf = true;
-    processPdf.mockRejectedValue(new Error('PDF corrupto'));
+    (processPdf as jest.Mock).mockRejectedValue(new Error('PDF corrupto'));
 
     await handler(req, res);
 
@@ -207,7 +231,7 @@ describe('API /api/extract PDF Handler', () => {
 
   it('debe aceptar PDF con texto vacío (comportamiento actual)', async () => {
     req._simulateValidPdf = true;
-    processPdf.mockResolvedValue(''); // texto vacío
+    (processPdf as jest.Mock).mockResolvedValue(''); // texto vacío
 
     await handler(req, res);
 

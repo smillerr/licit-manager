@@ -1,6 +1,19 @@
 import fs from 'fs';
 import path from 'path';
-import { processPdf } from '../../lib/pdfService';
+import { processPdf } from '../lib/pdfService';
+
+interface SizeInfo {
+  name: string;
+  size: number;
+}
+
+interface TestResult {
+  size: string;
+  success: boolean;
+  time?: number;
+  fileSize?: number;
+  error?: string;
+}
 
 describe('Pruebas de Carga y Rendimiento', () => {
   const loadTestDir = path.join(process.cwd(), 'tests', 'samples', 'load-test');
@@ -11,7 +24,6 @@ describe('Pruebas de Carga y Rendimiento', () => {
       fs.mkdirSync(loadTestDir, { recursive: true });
     }
     
-    // Crear PDF de muestra para pruebas de carga
     const pdfContent = Buffer.from(
       '%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n' +
       '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n' +
@@ -25,7 +37,7 @@ describe('Pruebas de Carga y Rendimiento', () => {
 
   it('debe procesar múltiples PDFs concurrentemente', async () => {
     const concurrentRequests = 5;
-    const promises = [];
+    const promises: Promise<string>[] = [];
     
     const startTime = Date.now();
     
@@ -44,25 +56,23 @@ describe('Pruebas de Carga y Rendimiento', () => {
     expect(successful.length).toBe(concurrentRequests);
     expect(failed.length).toBe(0);
     
-    // Verificar que el tiempo por request es razonable
     const avgTimePerRequest = totalTime / concurrentRequests;
     console.log(`📊 Tiempo promedio por request: ${avgTimePerRequest}ms`);
-    expect(avgTimePerRequest).toBeLessThan(5000); // Menos de 5 segundos por request
+    expect(avgTimePerRequest).toBeLessThan(5000);
   });
 
   it('debe manejar PDFs de diferentes tamaños eficientemente', async () => {
-    const sizes = [
-      { name: 'pequeño', size: 1024 },      // 1KB
-      { name: 'mediano', size: 1024 * 100 }, // 100KB  
-      { name: 'grande', size: 1024 * 1024 }  // 1MB
+    const sizes: SizeInfo[] = [
+      { name: 'pequeño', size: 1024 },
+      { name: 'mediano', size: 1024 * 100 },
+      { name: 'grande', size: 1024 * 1024 }
     ];
     
-    const results = [];
+    const results: TestResult[] = [];
     
     for (const sizeInfo of sizes) {
       const testPdfPath = path.join(loadTestDir, `test-${sizeInfo.name}.pdf`);
       
-      // Crear PDF del tamaño especificado
       const content = Buffer.from('%PDF-1.4\n' + 'x'.repeat(sizeInfo.size));
       fs.writeFileSync(testPdfPath, content);
       
@@ -83,30 +93,28 @@ describe('Pruebas de Carga y Rendimiento', () => {
         results.push({
           size: sizeInfo.name,
           success: false,
-          error: error.message
+          error: (error as Error).message
         });
       }
       
-      // Limpiar
       fs.unlinkSync(testPdfPath);
     }
     
-    // Validar que todos fueron exitosos
     const successful = results.filter(r => r.success);
     expect(successful.length).toBe(sizes.length);
     
-    // Validar que el tiempo de procesamiento escala razonablemente
     if (successful.length > 1) {
-      const smallTime = successful.find(r => r.size === 'pequeño').time;
-      const largeTime = successful.find(r => r.size === 'grande').time;
+      const smallTime = successful.find(r => r.size === 'pequeño')?.time;
+      const largeTime = successful.find(r => r.size === 'grande')?.time;
       
-      // El tiempo para PDF grande no debería ser órdenes de magnitud mayor
-      expect(largeTime / smallTime).toBeLessThan(10); // Máximo 10x más lento
+      if (smallTime && largeTime) {
+        expect(largeTime / smallTime).toBeLessThan(10);
+      }
     }
   });
 
   it('debe mantener estabilidad bajo carga prolongada', async () => {
-    const duration = 30000; // 30 segundos
+    const duration = 30000;
     const requestsPerSecond = 2;
     const totalRequests = Math.floor(duration / 1000) * requestsPerSecond;
     
@@ -116,28 +124,25 @@ describe('Pruebas de Carga y Rendimiento', () => {
     
     console.log(`🔄 Iniciando prueba de estabilidad: ${totalRequests} requests en ${duration}ms`);
     
-    const executeRequest = async () => {
+    const executeRequest = async (): Promise<void> => {
       try {
         await processPdf(samplePdfPath);
         completed++;
       } catch (error) {
         errors++;
-        console.error('Error en request:', error.message);
+        console.error('Error en request:', (error as Error).message);
       }
     };
     
-    // Ejecutar requests de forma distribuida
     const interval = setInterval(executeRequest, 1000 / requestsPerSecond);
     
-    // Detener después de la duración especificada
-    await new Promise(resolve => {
+    await new Promise<void>(resolve => {
       setTimeout(() => {
         clearInterval(interval);
         resolve();
       }, duration);
     });
     
-    // Esperar a que terminen las requests pendientes
     await new Promise(resolve => setTimeout(resolve, 5000));
     
     const totalTime = Date.now() - startTime;
@@ -149,7 +154,7 @@ describe('Pruebas de Carga y Rendimiento', () => {
     console.log(`   📈 Tasa de éxito: ${successRate.toFixed(2)}%`);
     console.log(`   ⏱️  Tiempo total: ${totalTime}ms`);
     
-    expect(successRate).toBeGreaterThan(95); // 95% de éxito mínimo
-    expect(errors).toBeLessThan(totalRequests * 0.1); // Menos del 10% de errores
-  }, 40000); // Timeout extendido para prueba de estabilidad
+    expect(successRate).toBeGreaterThan(95);
+    expect(errors).toBeLessThan(totalRequests * 0.1);
+  }, 40000);
 });
