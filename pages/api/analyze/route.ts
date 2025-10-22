@@ -1,13 +1,19 @@
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Método no permitido" });
-  }
+import { NextRequest, NextResponse } from 'next/server';
 
+interface AnalysisResponse {
+  analysis: string;
+  error?: string;
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse<AnalysisResponse>> {
   try {
-    const { text } = req.body;
+    const { text } = await req.json();
 
     if (!text || text.trim().length === 0) {
-      return res.status(400).json({ error: "No se recibió texto para analizar." });
+      return NextResponse.json(
+        { error: "No se recibió texto para analizar." },
+        { status: 400 }
+      );
     }
 
     console.log('📝 Texto recibido para análisis:', text.length, 'caracteres');
@@ -31,10 +37,13 @@ Este documento contiene texto extraído de un PDF. Para un análisis más detall
 **Primeras 200 caracteres:**
 "${text.substring(0, 200)}..."`;
 
-    return res.status(200).json({ analysis });
+    return NextResponse.json({ analysis });
 
   } catch (error) {
     console.error("❌ Error en análisis:", error);
-    return res.status(500).json({ error: "Error interno al procesar el análisis." });
+    return NextResponse.json(
+      { error: "Error interno al procesar el análisis." },
+      { status: 500 }
+    );
   }
 }

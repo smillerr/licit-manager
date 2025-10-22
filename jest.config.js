@@ -1,4 +1,5 @@
 module.exports = {
+  preset: 'ts-jest',
   testEnvironment: 'node',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   moduleNameMapping: {
@@ -16,3 +17,4 @@ module.exports = {
     '/node_modules/(?!(pdf-parse)/)'
   ],
 };
+

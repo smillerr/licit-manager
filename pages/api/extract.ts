@@ -1,4 +1,5 @@
-import formidable from 'formidable';
+import { NextApiRequest, NextApiResponse } from 'next';
+import formidable, { Fields, Files } from 'formidable';
 import fs from 'fs';
 import path from 'path';
 import { processPdf } from '../../lib/pdfService';
@@ -7,7 +8,36 @@ export const config = {
   api: { bodyParser: false },
 };
 
-export default async function handler(req, res) {
+interface FileWithPath {
+  filepath: string;
+  originalFilename?: string;
+  mimetype?: string;
+  size: number;
+  path?: string;
+}
+
+interface ApiResponse {
+  success?: boolean;
+  text?: string;
+  metadata?: {
+    characters: number;
+    words: number;
+    lines: number;
+    size: number;
+    pages: number;
+  };
+  message?: string;
+  error?: string;
+  suggestion?: string;
+  receivedType?: string;
+  maxSize?: string;
+  technicalDetails?: string;
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse<ApiResponse>
+): Promise<void> {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido. Use POST para subir archivos.' });
   }
@@ -28,18 +58,18 @@ export default async function handler(req, res) {
     multiples: false,
   });
 
-  let tempFilePath = null;
+  let tempFilePath: string | null = null;
 
   try {
     // Parsear el formulario
-    const { fields, files } = await new Promise((resolve, reject) => {
-      form.parse(req, (err, fields, files) => {
+    const { fields, files } = await new Promise<{ fields: Fields; files: Files }>((resolve, reject) => {
+      form.parse(req, (err: Error | null, fields: Fields, files: Files) => {
         if (err) reject(err);
         else resolve({ fields, files });
       });
     });
 
-    let file = files.file;
+    let file = files.file as FileWithPath | FileWithPath[];
     if (Array.isArray(file)) file = file[0];
     
     if (!file) {
@@ -49,8 +79,8 @@ export default async function handler(req, res) {
       });
     }
 
-    tempFilePath = file.filepath || file.path;
-    const mimeType = file.mimetype || file.type;
+    tempFilePath = file.filepath || file.path || '';
+    const mimeType = file.mimetype || '';
 
     console.log('📁 Archivo recibido:', file.originalFilename, '- Tamaño:', file.size, 'bytes');
 
@@ -139,13 +169,15 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error('💥 Error en el proceso:', err.message);
+    console.error('💥 Error en el proceso:', (err as Error).message);
     
     // Limpiar archivo temporal en caso de error
     cleanTempFile(tempFilePath);
 
+    const error = err as Error & { code?: string };
+    
     // Manejar errores específicos con mensajes útiles al usuario
-    if (err.code === 'LIMIT_FILE_SIZE') {
+    if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(413).json({ 
         error: 'Archivo demasiado grande',
         message: 'El tamaño máximo permitido es 50MB.',
@@ -154,7 +186,7 @@ export default async function handler(req, res) {
       });
     }
 
-    if (err.message.includes('escaneado') || err.message.includes('imagen')) {
+    if (error.message.includes('escaneado') || error.message.includes('imagen')) {
       return res.status(422).json({ 
         error: 'PDF escaneado detectado',
         message: 'Este PDF parece ser una imagen escaneada y no contiene texto seleccionable.',
@@ -162,7 +194,7 @@ export default async function handler(req, res) {
       });
     }
 
-    if (err.message.includes('protegido') || err.message.includes('contraseña')) {
+    if (error.message.includes('protegido') || error.message.includes('contraseña')) {
       return res.status(422).json({ 
         error: 'PDF protegido',
         message: 'Este PDF está protegido con contraseña o tiene restricciones de seguridad.',
@@ -170,7 +202,7 @@ export default async function handler(req, res) {
       });
     }
 
-    if (err.message.includes('corrupto') || err.message.includes('inválido')) {
+    if (error.message.includes('corrupto') || error.message.includes('inválido')) {
       return res.status(422).json({ 
         error: 'PDF dañado',
         message: 'El archivo PDF está corrupto o no es válido.',
@@ -178,7 +210,7 @@ export default async function handler(req, res) {
       });
     }
 
-    if (err.message.includes('no contiene texto') || err.message.includes('No se encontró texto')) {
+    if (error.message.includes('no contiene texto') || error.message.includes('No se encontró texto')) {
       return res.status(422).json({ 
         error: 'Sin texto extraíble',
         message: 'El PDF fue procesado pero no se encontró texto legible.',
@@ -186,7 +218,7 @@ export default async function handler(req, res) {
       });
     }
 
-    if (err.message.includes('no encontrado')) {
+    if (error.message.includes('no encontrado')) {
       return res.status(400).json({ 
         error: 'Archivo no encontrado',
         message: 'El archivo no se pudo encontrar o acceder.',
@@ -198,20 +230,20 @@ export default async function handler(req, res) {
     return res.status(400).json({ 
       error: 'Error al procesar el PDF',
       message: 'Ocurrió un error inesperado al procesar el archivo.',
-      technicalDetails: err.message,
+      technicalDetails: error.message,
       suggestion: 'Por favor, verifica que el archivo sea un PDF válido y vuelve a intentarlo.'
     });
   }
 }
 
 // Función auxiliar para limpiar archivos temporales
-function cleanTempFile(filePath) {
+function cleanTempFile(filePath: string | null): void {
   if (filePath && fs.existsSync(filePath)) {
     try {
       fs.unlinkSync(filePath);
       console.log('🧹 Archivo temporal eliminado');
     } catch (unlinkError) {
-      console.error('⚠️ Error eliminando archivo temporal:', unlinkError.message);
+      console.error('⚠️ Error eliminando archivo temporal:', (unlinkError as Error).message);
     }
   }
 }

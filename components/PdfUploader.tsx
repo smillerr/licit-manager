@@ -1,24 +1,36 @@
+// components/PdfUploader.tsx
+'use client';
 import { useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function PdfUploader({ onResult = () => {} }) {
-  const inputRef = useRef();
-  const [error, setError] = useState("");
-  const [progress, setProgress] = useState(0);
-  const [uploading, setUploading] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const [toast, setToast] = useState({ show: false, msg: "", ok: true });
-  const [fileName, setFileName] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [fileValid, setFileValid] = useState(false);
-  const [lastText, setLastText] = useState("");
+interface PdfUploaderProps {
+  onResult?: (text: string) => void;
+}
 
-  const showToast = useCallback((msg, ok = true) => {
+interface ToastState {
+  show: boolean;
+  msg: string;
+  ok: boolean;
+}
+
+export default function PdfUploader({ onResult = () => {} }: PdfUploaderProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string>("");
+  const [progress, setProgress] = useState<number>(0);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [dragOver, setDragOver] = useState<boolean>(false);
+  const [toast, setToast] = useState<ToastState>({ show: false, msg: "", ok: true });
+  const [fileName, setFileName] = useState<string>("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileValid, setFileValid] = useState<boolean>(false);
+  const [lastText, setLastText] = useState<string>("");
+
+  const showToast = useCallback((msg: string, ok: boolean = true) => {
     setToast({ show: true, msg, ok });
     setTimeout(() => setToast({ show: false, msg: "", ok }), 3500);
   }, []);
 
-  const validateFileIntegrity = useCallback(async (file) => {
+  const validateFileIntegrity = useCallback(async (file: File): Promise<boolean> => {
     try {
       if (file.size < 100) {
         setError("El archivo está vacío o es ilegible.");
@@ -44,7 +56,7 @@ export default function PdfUploader({ onResult = () => {} }) {
     }
   }, []);
 
-  const handleSelect = useCallback(async (file) => {
+  const handleSelect = useCallback(async (file: File | null) => {
     setError("");
     setFileValid(false);
     setLastText("");
@@ -78,7 +90,7 @@ export default function PdfUploader({ onResult = () => {} }) {
     showToast("Archivo válido listo para subir ✅", true);
   }, [showToast, validateFileIntegrity]);
 
-  const uploadFile = useCallback((file) => {
+  const uploadFile = useCallback((file: File | null) => {
     if (!file) {
       setError("Selecciona un archivo antes de subir.");
       return;
@@ -109,7 +121,6 @@ export default function PdfUploader({ onResult = () => {} }) {
           const data = JSON.parse(xhr.responseText);
           const text = data.text || "";
           
-          // Solo establecer el texto extraído, sin análisis de IA
           setLastText(text);
           onResult(text);
           showToast("PDF procesado correctamente ✅", true);
@@ -166,19 +177,19 @@ export default function PdfUploader({ onResult = () => {} }) {
     xhr.send(form);
   }, [onResult, showToast]);
 
-  const handleSubmit = useCallback((e) => {
+  const handleSubmit = useCallback((e?: React.FormEvent) => {
     e?.preventDefault();
     uploadFile(selectedFile);
   }, [selectedFile, uploadFile]);
 
-  const handleDrop = useCallback(async (e) => {
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer?.files?.[0];
-    await handleSelect(file);
+    await handleSelect(file || null);
   }, [handleSelect]);
 
-  const handleDragOver = useCallback((e) => {
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragOver(true);
   }, []);
@@ -211,7 +222,7 @@ export default function PdfUploader({ onResult = () => {} }) {
             accept="application/pdf"
             className="hidden"
             id="fileInput"
-            onChange={(e) => handleSelect(e.target.files[0])}
+            onChange={(e) => handleSelect(e.target.files?.[0] || null)}
           />
           <label
             htmlFor="fileInput"
@@ -281,7 +292,7 @@ export default function PdfUploader({ onResult = () => {} }) {
         )}
       </AnimatePresence>
 
-      {/* Texto extraído - MEJORADO */}
+      {/* Texto extraído */}
       <div className="card">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-lg font-semibold">Texto extraído del PDF</h3>

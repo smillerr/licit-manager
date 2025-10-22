@@ -1,10 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 
-// Mock para pdf-parse - CORREGIDO
+// Mock para pdf-parse
 jest.mock('pdf-parse', () => 
-  jest.fn((buffer) => {
-    // Simular diferentes comportamientos según el buffer
+  jest.fn((buffer: Buffer) => {
     if (buffer.toString().includes('%PDF')) {
       return Promise.resolve({
         text: 'Texto de prueba del PDF\nEste es un pliego de licitación ejemplo.\nEmpresa: Ejemplo S.A.\nMonto: $100,000',
@@ -17,15 +16,14 @@ jest.mock('pdf-parse', () =>
   })
 );
 
-// Importar después de los mocks
-import { processPdf, validatePdf } from '../../lib/pdfService';
+// Importar desde la ubicación correcta
+import { processPdf, validatePdf } from '../lib/pdfService';
 
 describe('PDF Service - Unit Tests', () => {
   const samplesDir = path.join(process.cwd(), 'tests', 'samples');
   const tempDir = path.join(samplesDir, 'temp');
   
   beforeAll(() => {
-    // Crear directorio temporal si no existe
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
@@ -36,7 +34,6 @@ describe('PDF Service - Unit Tests', () => {
   });
 
   afterAll(() => {
-    // Limpiar directorio temporal después de todas las pruebas
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
@@ -53,7 +50,7 @@ describe('PDF Service - Unit Tests', () => {
     });
 
     it('debe rechazar buffer nulo', () => {
-      expect(() => validatePdf(null)).toThrow('PDF vacío o inválido');
+      expect(() => validatePdf(null as any)).toThrow('PDF vacío o inválido');
     });
 
     it('debe rechazar archivo que no es PDF', () => {
@@ -80,7 +77,7 @@ describe('PDF Service - Unit Tests', () => {
       
       expect(typeof result).toBe('string');
       expect(result.length).toBeGreaterThan(0);
-      expect(result).toContain('Texto de prueba del PDF'); // CORREGIDO: texto del mock real
+      expect(result).toContain('Texto de prueba del PDF');
     });
 
     it('debe lanzar error para archivo inexistente', async () => {
@@ -94,7 +91,6 @@ describe('PDF Service - Unit Tests', () => {
 
       const result = await processPdf(testPdf);
       
-      // Verificar que no tenga caracteres de control
       expect(result).not.toMatch(/[\x00-\x1F\x7F-\x9F]/);
     });
 
@@ -105,7 +101,4 @@ describe('PDF Service - Unit Tests', () => {
       await expect(processPdf(testPdf)).rejects.toThrow();
     });
   });
-
-  // ELIMINAR las pruebas de extractTextFromPdf ya que esa función no existe
-  // O si necesitas probar esa funcionalidad, usa processPdf en su lugar
 });

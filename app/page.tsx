@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import PdfUploader from '@/components/PdfUploader';
 
 export default function Home() {
-  const handleAnalysisResult = useCallback((text) => {
+  const handleAnalysisResult = useCallback((text: string) => {
     console.log('Texto extraído:', text);
     // Aquí puedes agregar más lógica para procesar el resultado
   }, []);

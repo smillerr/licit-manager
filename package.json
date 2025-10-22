@@ -10,7 +10,6 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:unit": "jest tests/unit/",
-
     "test:performance": "jest tests/performance/",
     "test:all": "jest tests/ --coverage",
     "test:report": "jest --coverage --coverageReporters=html"
@@ -43,6 +42,7 @@
     "next-test-api-route-handler": "^5.0.3",
     "postcss": "^8.5.6",
     "tailwindcss": "^4",
+    "ts-jest": "^29.4.5",
     "typescript": "^5"
   }
 }
