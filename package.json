@@ -22,7 +22,8 @@
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.4.296",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@babel/runtime": "^7.28.4",
