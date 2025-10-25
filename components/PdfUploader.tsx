@@ -2,6 +2,7 @@
 "use client";
 import { useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import EditableAIAnalysisComponent from "@/components/EditableAIAnalysisComponent";
 
 interface PdfUploaderProps {
   onResult?: (text: string) => void;
@@ -394,81 +395,38 @@ export default function PdfUploader({ onResult = () => {} }: PdfUploaderProps) {
       </div>
 
       {/* Análisis con IA */}
-      {analyzing && (
-        <div className="card">
-          <p className="text-center text-gray-600">Analizando con IA... 🤖</p>
-        </div>
-      )}
+{analysis && (
+  <div className="card">
+    <div className="flex justify-between items-center mb-3">
+      <h3 className="text-lg font-semibold">
+        Análisis del Pliego con IA
+      </h3>
+      <button
+        onClick={() => {
+          const text = Object.entries(analysis)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join("\n\n");
+          navigator.clipboard.writeText(text);
+          showToast("Análisis copiado al portapapeles 📋", true);
+        }}
+        className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+      >
+        Copiar análisis
+      </button>
+    </div>
 
-      {analysis && (
-        <div className="card">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-lg font-semibold">
-              Análisis del Pliego con IA
-            </h3>
-            <button
-              onClick={() => {
-                const text = Object.entries(analysis)
-                  .map(([key, value]) => `${key}: ${value}`)
-                  .join("\n\n");
-                navigator.clipboard.writeText(text);
-                showToast("Análisis copiado al portapapeles 📋", true);
-              }}
-              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-            >
-              Copiar análisis
-            </button>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <h4 className="font-semibold text-gray-800">
-                Resumen del Pliego
-              </h4>
-              <p className="text-sm text-gray-600 mt-1">{analysis.resumen}</p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-800">
-                Experiencia Requerida a la Proponente
-              </h4>
-              <p className="text-sm text-gray-600 mt-1">
-                {analysis.experiencia_requerida}
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-800">
-                Códigos Exigidos para la Interventoría
-              </h4>
-              <p className="text-sm text-gray-600 mt-1">
-                {analysis.codigos_exigidos}
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-800">
-                Experiencia Específica del Personal
-              </h4>
-              <p className="text-sm text-gray-600 mt-1">
-                {analysis.experiencia_personal}
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-800">
-                Indicadores Financieros Exigidos
-              </h4>
-              <p className="text-sm text-gray-600 mt-1">
-                {analysis.indicadores_financieros}
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-800">
-                Documentos Exigidos
-              </h4>
-              <p className="text-sm text-gray-600 mt-1">
-                {analysis.documentos_exigidos}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+ <EditableAIAnalysisComponent
+  initialData={analysis}
+  onSave={(updated: AnalysisResult) => {
+    setAnalysis(updated);
+    showToast("Cambios guardados ✅", true);
+  }}
+/>
+
+
+  </div>
+)}
+
     </div>
   );
 }

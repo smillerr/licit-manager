@@ -118,4 +118,5 @@ export default async function handler(
     console.error("Error en análisis:", error);
     return res.status(500).json({ error: "Error interno al analizar texto." });
   }
+  
 }
