@@ -4,6 +4,9 @@ import { useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import EditableAIAnalysisComponent from "@/components/EditableAIAnalysisComponent";
 
+import { jsPDF } from "jspdf";
+import { saveAs } from "file-saver";
+
 interface PdfUploaderProps {
   onResult?: (text: string) => void;
 }
@@ -414,7 +417,43 @@ export default function PdfUploader({ onResult = () => {} }: PdfUploaderProps) {
         Copiar análisis
       </button>
     </div>
+{/* Botones para descargar análisis */}
+<div className="flex gap-2 mt-2">
+  <button
+    onClick={() => {
+      if (!analysis) return;
+      const doc = new jsPDF();
+      doc.text("Análisis del Pliego con IA", 10, 10);
+      let y = 20;
+      Object.entries(analysis).forEach(([key, value]) => {
+        const lines = doc.splitTextToSize(`${key}: ${value}`, 180);
+        doc.text(lines, 10, y);
+        y += lines.length * 7;
+      });
+      doc.save("Analisis_Licitacion.pdf");
+    }}
+    className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition"
+  >
+    Descargar PDF
+  </button>
 
+  <button
+    onClick={() => {
+      if (!analysis) return;
+      let content = "Análisis del Pliego con IA\n\n";
+      Object.entries(analysis).forEach(([key, value]) => {
+        content += `${key}: ${value}\n\n`;
+      });
+      const blob = new Blob([content], { type: "application/msword" });
+      saveAs(blob, "Analisis_Licitacion.doc");
+    }}
+    className="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition"
+  >
+    Descargar Word
+  </button>
+</div>
+
+  
  <EditableAIAnalysisComponent
   initialData={analysis}
   onSave={(updated: AnalysisResult) => {

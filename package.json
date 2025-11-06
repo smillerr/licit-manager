@@ -15,8 +15,10 @@
     "test:report": "jest --coverage --coverageReporters=html"
   },
   "dependencies": {
+    "file-saver": "^2.0.5",
     "formidable": "^3.5.4",
     "framer-motion": "^12.23.24",
+    "jspdf": "^3.0.3",
     "next": "15.5.4",
     "openai": "^4.104.0",
     "pdf-parse": "^2.4.5",
@@ -31,6 +33,7 @@
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
+    "@types/file-saver": "^2.0.7",
     "@types/formidable": "^3.4.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
