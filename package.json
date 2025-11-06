@@ -15,6 +15,7 @@
     "test:report": "jest --coverage --coverageReporters=html"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "formidable": "^3.5.4",
     "framer-motion": "^12.23.24",
