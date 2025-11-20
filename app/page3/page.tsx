@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import ExcelJS from 'exceljs';
 
 interface ExperienceField {
@@ -9,6 +9,9 @@ interface ExperienceField {
   value: string;
   autoCompleted: boolean;
   suggestions: string[];
+  required?: boolean;
+  validation?: (value: string) => string | null;
+  error?: string;
 }
 
 interface AutoCompleteConfig {
@@ -16,6 +19,130 @@ interface AutoCompleteConfig {
   showIndicators: boolean;
   confirmChanges: boolean;
 }
+
+// Componente memoizado fuera del componente principal
+const FieldWithAutoComplete = memo(({ 
+  field, 
+  config,
+  onFieldChange,
+  onAcceptSuggestion,
+  onRejectSuggestion
+}: { 
+  field: ExperienceField;
+  config: AutoCompleteConfig;
+  onFieldChange: (fieldId: string, value: string) => void;
+  onAcceptSuggestion: (fieldId: string, suggestion: string) => void;
+  onRejectSuggestion: (fieldId: string) => void;
+}) => (
+  <div className={`p-4 rounded-lg border transition-colors ${
+    field.autoCompleted && config.showIndicators
+      ? 'border-emerald-500 bg-emerald-50 shadow-sm'
+      : 'border-gray-200 bg-white'
+  }`}>
+    <label className="block text-sm font-medium text-black-900 mb-2">
+      {field.label}
+      {field.required && <span className="text-red-500 ml-1">*</span>}
+      {config.showIndicators && field.autoCompleted && (
+        <span className="ml-2 px-2 py-1 text-xs bg-emerald-500 text-white rounded-full font-medium shadow-sm">
+          ✓ Auto-completado
+        </span>
+      )}
+    </label>
+
+    <div className="flex gap-2">
+      <input
+        type="text"
+        value={field.value}
+        onChange={(e) => onFieldChange(field.id, e.target.value)}
+        className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 bg-white text-gray-900 ${
+          field.error 
+            ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
+            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+        }`}
+        placeholder={`Ingrese ${field.label.toLowerCase()}...`}
+      />
+      
+      {field.suggestions.length > 0 && config.enabled && !field.value && (
+        <div className="flex gap-1">
+          <button
+            onClick={() => onAcceptSuggestion(field.id, field.suggestions[0])}
+            className="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm transition-colors"
+            title="Aceptar sugerencia"
+          >
+            ✓
+          </button>
+          <button
+            onClick={() => onRejectSuggestion(field.id)}
+            className="px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm transition-colors"
+            title="Rechazar sugerencia"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+    </div>
+
+    {/* Error message */}
+    {field.error && (
+      <p className="mt-1 text-sm text-red-600">{field.error}</p>
+    )}
+
+    {/* Sugerencias disponibles */}
+    {field.suggestions.length > 0 && config.enabled && (
+      <div className="mt-2">
+        <p className="text-xs text-gray-500 mb-1">Sugerencias:</p>
+        <div className="flex flex-wrap gap-1">
+          {field.suggestions.slice(0, 3).map((suggestion, index) => (
+            <button
+              key={index}
+              onClick={() => onAcceptSuggestion(field.id, suggestion)}
+              className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded hover:bg-blue-200 transition-colors"
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+));
+
+FieldWithAutoComplete.displayName = 'FieldWithAutoComplete';
+
+// Funciones de validación
+const validateDate = (value: string): string | null => {
+  if (!value) return null;
+  const dateRegex = /^\d{1,2}-\d{1,2}-\d{4}$/;
+  if (!dateRegex.test(value)) {
+    return 'Formato debe ser DD-MM-AAAA';
+  }
+  return null;
+};
+
+const validatePercentage = (value: string): string | null => {
+  if (!value) return null;
+  const num = parseFloat(value.replace('%', ''));
+  if (isNaN(num) || num < 0 || num > 100) {
+    return 'Debe ser un porcentaje entre 0 y 100';
+  }
+  return null;
+};
+
+const validateNumber = (value: string): string | null => {
+  if (!value) return null;
+  const num = parseFloat(value);
+  if (isNaN(num) || num < 0) {
+    return 'Debe ser un número positivo';
+  }
+  return null;
+};
+
+const validateRequired = (value: string): string | null => {
+  if (!value || value.trim() === '') {
+    return 'Este campo es obligatorio';
+  }
+  return null;
+};
 
 export default function Page3() {
   const [fields, setFields] = useState<ExperienceField[]>([]);
@@ -25,7 +152,9 @@ export default function Page3() {
     confirmChanges: true
   });
   const [saved, setSaved] = useState(false);
+  const [autoSaved, setAutoSaved] = useState(false);
   const [savedData, setSavedData] = useState<any[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Inicializar campos basados en el formato Excel
   useEffect(() => {
@@ -35,7 +164,9 @@ export default function Page3() {
         label: "No. de orden",
         value: "",
         autoCompleted: false,
-        suggestions: ["1", "2", "3", "4", "5"]
+        suggestions: ["1", "2", "3", "4", "5"],
+        required: true,
+        validation: validateRequired
       },
       {
         id: "numero_rup",
@@ -49,28 +180,36 @@ export default function Page3() {
         label: "Experiencia requerida para la actividad principal",
         value: "",
         autoCompleted: false,
-        suggestions: ["Experiencia General", "Experiencia Específica"]
+        suggestions: ["Experiencia General", "Experiencia Específica"],
+        required: true,
+        validation: validateRequired
       },
       {
         id: "entidad_contratante",
         label: "Entidad contratante",
         value: "",
         autoCompleted: false,
-        suggestions: []
+        suggestions: [],
+        required: true,
+        validation: validateRequired
       },
       {
         id: "numero_contrato",
         label: "Contrato o resolución - No.",
         value: "",
         autoCompleted: false,
-        suggestions: []
+        suggestions: [],
+        required: true,
+        validation: validateRequired
       },
       {
         id: "objeto_contrato",
         label: "Contrato o resolución - Objeto",
         value: "",
         autoCompleted: false,
-        suggestions: []
+        suggestions: [],
+        required: true,
+        validation: validateRequired
       },
       {
         id: "clasificador_bienes",
@@ -91,7 +230,8 @@ export default function Page3() {
         label: "Porcentaje de participación (%)",
         value: "",
         autoCompleted: false,
-        suggestions: ["100%", "50%", "30%", "25%"]
+        suggestions: ["100%", "50%", "30%", "25%"],
+        validation: validatePercentage
       },
       {
         id: "integrante_experiencia",
@@ -105,21 +245,27 @@ export default function Page3() {
         label: "Fecha de Iniciación [Dia-mes-año]",
         value: "",
         autoCompleted: false,
-        suggestions: []
+        suggestions: [],
+        required: true,
+        validation: (value) => validateRequired(value) || validateDate(value)
       },
       {
         id: "fecha_terminacion",
         label: "Fecha de Terminación [Dia-mes-año]",
         value: "",
         autoCompleted: false,
-        suggestions: []
+        suggestions: [],
+        required: true,
+        validation: (value) => validateRequired(value) || validateDate(value)
       },
       {
         id: "valor_contrato_smmlv",
         label: "Valor total del contrato en SMMLV",
         value: "",
         autoCompleted: false,
-        suggestions: []
+        suggestions: [],
+        required: true,
+        validation: (value) => validateRequired(value) || validateNumber(value)
       },
       {
         id: "valor_afectado_participacion",
@@ -141,6 +287,8 @@ export default function Page3() {
 
   // Simular datos de análisis previo (esto vendría de la página anterior)
   useEffect(() => {
+    if (isInitialized) return;
+    
     const mockAnalysisData = {
       entidad_contratante: "CORPORACIÓN AUTÓNOMA REGIONAL DEL VALLE DEL CAUCA - CVC",
       objeto_contrato: "Interventoría de obra pública de infraestructura social",
@@ -148,47 +296,100 @@ export default function Page3() {
       forma_ejecucion: "Individual (I)"
     };
 
-    setTimeout(() => {
-      setFields(prev => prev.map(field => {
-        const suggestedValue = mockAnalysisData[field.id as keyof typeof mockAnalysisData];
-        if (suggestedValue && !field.value) {
-          return {
-            ...field,
-            value: suggestedValue,
-            autoCompleted: true,
-            suggestions: [suggestedValue, ...field.suggestions]
-          };
+    const timer = setTimeout(() => {
+      setFields(prev => {
+        if (prev.length === 0) return prev;
+        
+        return prev.map(field => {
+          const suggestedValue = mockAnalysisData[field.id as keyof typeof mockAnalysisData];
+          if (suggestedValue && !field.value) {
+            return {
+              ...field,
+              value: suggestedValue,
+              autoCompleted: true,
+              suggestions: field.suggestions.includes(suggestedValue) 
+                ? field.suggestions 
+                : [suggestedValue, ...field.suggestions]
+            };
+          }
+          return field;
+        });
+      });
+      setIsInitialized(true);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [isInitialized]);
+
+  const handleFieldChange = useCallback((fieldId: string, value: string) => {
+    setFields(prev => {
+      const updatedFields = prev.map(field => {
+        if (field.id === fieldId) {
+          const error = field.validation ? field.validation(value) : null;
+          return { ...field, value, autoCompleted: false, error: error || undefined };
         }
         return field;
-      }));
-    }, 1000);
+      });
+
+      // Cálculo automático del valor afectado por participación
+      if (fieldId === 'valor_contrato_smmlv' || fieldId === 'porcentaje_participacion') {
+        const valorContrato = updatedFields.find(f => f.id === 'valor_contrato_smmlv')?.value || '';
+        const porcentaje = updatedFields.find(f => f.id === 'porcentaje_participacion')?.value || '';
+        
+        const valorNum = parseFloat(valorContrato);
+        const porcentajeNum = parseFloat(porcentaje.replace('%', ''));
+        
+        if (!isNaN(valorNum) && !isNaN(porcentajeNum)) {
+          const valorAfectado = (valorNum * porcentajeNum / 100).toFixed(2);
+          return updatedFields.map(field => 
+            field.id === 'valor_afectado_participacion'
+              ? { ...field, value: valorAfectado, autoCompleted: true }
+              : field
+          );
+        }
+      }
+
+      return updatedFields;
+    });
   }, []);
 
-  const handleFieldChange = (fieldId: string, value: string) => {
-    setFields(prev => prev.map(field => 
-      field.id === fieldId 
-        ? { ...field, value, autoCompleted: false }
-        : field
-    ));
-  };
-
-  const acceptSuggestion = (fieldId: string, suggestion: string) => {
+  const acceptSuggestion = useCallback((fieldId: string, suggestion: string) => {
     setFields(prev => prev.map(field => 
       field.id === fieldId 
         ? { ...field, value: suggestion, autoCompleted: true }
         : field
     ));
-  };
+  }, []);
 
-  const rejectSuggestion = (fieldId: string) => {
+  const rejectSuggestion = useCallback((fieldId: string) => {
     setFields(prev => prev.map(field => 
       field.id === fieldId 
         ? { ...field, autoCompleted: false, suggestions: field.suggestions.slice(1) }
         : field
     ));
-  };
+  }, []);
 
   const handleSave = () => {
+    // Validar todos los campos
+    const fieldsWithErrors = fields.map(field => {
+      if (field.required && !field.value) {
+        return { ...field, error: 'Este campo es obligatorio' };
+      }
+      if (field.validation && field.value) {
+        const error = field.validation(field.value);
+        return { ...field, error: error || undefined };
+      }
+      return field;
+    });
+
+    const hasErrors = fieldsWithErrors.some(field => field.error);
+    
+    if (hasErrors) {
+      setFields(fieldsWithErrors);
+      alert('Por favor corrija los errores en el formulario antes de guardar');
+      return;
+    }
+
     const formData = {
       fecha_creacion: new Date().toLocaleString('es-CO'),
       campos: fields.reduce((acc, field) => {
@@ -406,9 +607,15 @@ export default function Page3() {
     })));
   };
 
-  // Cargar datos guardados al iniciar
+  // Cargar datos guardados al iniciar (prioriza autosave)
   useEffect(() => {
-    const saved = localStorage.getItem('formato3_experiencia');
+    // Intentar cargar primero el autoguardado
+    const autoSaved = localStorage.getItem('formato3_experiencia_autosave');
+    const manualSaved = localStorage.getItem('formato3_experiencia');
+    
+    // Priorizar autosave si existe, sino usar el guardado manual
+    const saved = autoSaved || manualSaved;
+    
     if (saved) {
       const parsedData = JSON.parse(saved);
       setFields(prev => prev.map(field => {
@@ -422,72 +629,38 @@ export default function Page3() {
         }
         return field;
       }));
+      setIsInitialized(true); // Marcar como inicializado si hay datos guardados
     }
   }, []);
 
-  const FieldWithAutoComplete = ({ field }: { field: ExperienceField }) => (
-    <div className={`p-4 rounded-lg border transition-colors ${
-      field.autoCompleted && config.showIndicators
-        ? 'border-emerald-500 bg-emerald-50 shadow-sm'
-        : 'border-green-200 bg-black'
-    }`}>
-      <label className="block text-sm font-medium text-black-900 mb-2">
-        {field.label}
-        {config.showIndicators && field.autoCompleted && (
-          <span className="ml-2 px-2 py-1 text-xs bg-emerald-500 text-white rounded-full font-medium shadow-sm">
-            ✓ Auto-completado
-          </span>
-        )}
-      </label>
+  // Autoguardado cada 3 segundos
+  useEffect(() => {
+    if (fields.length === 0) return;
 
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={field.value}
-          onChange={(e) => handleFieldChange(field.id, e.target.value)}
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-          placeholder={`Ingrese ${field.label.toLowerCase()}...`}
-        />
+    const autoSaveTimer = setTimeout(() => {
+      const hasData = fields.some(field => field.value);
+      if (hasData) {
+        const formData = {
+          fecha_creacion: new Date().toLocaleString('es-CO'),
+          campos: fields.reduce((acc, field) => {
+            acc[field.id] = {
+              valor: field.value,
+              autoCompletado: field.autoCompleted,
+              etiqueta: field.label
+            };
+            return acc;
+          }, {} as Record<string, any>)
+        };
+        localStorage.setItem('formato3_experiencia_autosave', JSON.stringify(formData));
         
-        {field.suggestions.length > 0 && config.enabled && !field.value && (
-          <div className="flex gap-1">
-            <button
-              onClick={() => acceptSuggestion(field.id, field.suggestions[0])}
-              className="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm transition-colors"
-              title="Aceptar sugerencia"
-            >
-              ✓
-            </button>
-            <button
-              onClick={() => rejectSuggestion(field.id)}
-              className="px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm transition-colors"
-              title="Rechazar sugerencia"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-      </div>
+        // Mostrar notificación de autoguardado
+        setAutoSaved(true);
+        setTimeout(() => setAutoSaved(false), 2000);
+      }
+    }, 3000);
 
-      {/* Sugerencias disponibles */}
-      {field.suggestions.length > 0 && config.enabled && (
-        <div className="mt-2">
-          <p className="text-xs text-gray-500 mb-1">Sugerencias:</p>
-          <div className="flex flex-wrap gap-1">
-            {field.suggestions.slice(0, 3).map((suggestion, index) => (
-              <button
-                key={index}
-                onClick={() => acceptSuggestion(field.id, suggestion)}
-                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded hover:bg-blue-200 transition-colors"
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+    return () => clearTimeout(autoSaveTimer);
+  }, [fields]);
 
   const autoCompletedCount = fields.filter(f => f.autoCompleted).length;
   const manualCompletedCount = fields.filter(f => f.value && !f.autoCompleted).length;
@@ -599,7 +772,14 @@ export default function Page3() {
       <div className="space-y-4 mb-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {fields.map(field => (
-            <FieldWithAutoComplete key={field.id} field={field} />
+            <FieldWithAutoComplete 
+              key={field.id} 
+              field={field}
+              config={config}
+              onFieldChange={handleFieldChange}
+              onAcceptSuggestion={acceptSuggestion}
+              onRejectSuggestion={rejectSuggestion}
+            />
           ))}
         </div>
       </div>
@@ -652,15 +832,28 @@ export default function Page3() {
         </div>
       )}
 
+      {/* Notificación de autoguardado */}
+      {autoSaved && (
+        <div className="fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg fade-in z-50 text-sm flex items-center gap-2">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          Autoguardado
+        </div>
+      )}
+
       {/* Información adicional */}
       <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <h3 className="font-semibold text-blue-900 mb-2">Información importante:</h3>
         <ul className="text-sm text-blue-800 space-y-1">
+          <li>• Los campos con <span className="text-red-500 font-bold">*</span> son obligatorios</li>
           <li>• Los campos marcados con ✓ verde fueron completados automáticamente</li>
-          <li>• Puede aceptar o rechazar sugerencias usando los botones ✓ y ✕</li>
+          <li>• El valor afectado por participación se calcula automáticamente</li>
+          <li>• Los datos se guardan automáticamente cada 3 segundos</li>
+          <li>• Las fechas deben ingresarse en formato DD-MM-AAAA (ej: 15-06-2024)</li>
+          <li>• Los porcentajes pueden incluir el símbolo % o solo el número</li>
           <li>• Los valores deben expresarse en Pesos Colombianos convertidos a SMMLV</li>
           <li>• Verifique que la información coincida con los registros en el RUP</li>
-          <li>• Use el botón Descargar Excel para obtener el formato oficial</li>
         </ul>
       </div>
     </main>
