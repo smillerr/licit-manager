@@ -1,3 +1,4 @@
+import { supabase } from '@/lib/supabaseClient';
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import AzureADProvider from "next-auth/providers/azure-ad";
@@ -5,6 +6,7 @@ import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 export default NextAuth({
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -22,7 +24,7 @@ export default NextAuth({
       clientSecret: process.env.GITHUB_SECRET!,
     }),
 
-    // ✅ LOGIN CON EMAIL Y CONTRASEÑA
+    // ✅ LOGIN CON EMAIL Y CONTRASEÑA DESDE SUPABASE
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -31,7 +33,6 @@ export default NextAuth({
       },
 
       async authorize(credentials) {
-        // ⛔️ Fix TS: credentials puede ser undefined
         if (!credentials?.email || !credentials.password) {
           throw new Error("Email y contraseña son obligatorios");
         }
@@ -39,18 +40,25 @@ export default NextAuth({
         const email = credentials.email;
         const password = credentials.password;
 
+        // Consultar usuario en Supabase
+        const { data: user, error } = await supabase
+          .from('app_users')
+          .select('*')
+          .eq('email', email)
+          .eq('password', password) // NOTA: En producción usar bcrypt para comparar hashes
+          .single();
 
-        if (email === "admin@test.com" && password === "123456") {
-          return {
-            id: "1",
-            name: "Administrador",
-            email: "admin@test.com",
-            role: "admin",
-          };
+        if (error || !user) {
+          console.error("Error auth:", error);
+          return null;
         }
 
-        // ❌ LOGIN FALLIDO
-        return null;
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        };
       },
     }),
   ],
