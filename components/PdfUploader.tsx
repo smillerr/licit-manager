@@ -265,6 +265,17 @@ export default function PdfUploader({ onResult = () => {} }: PdfUploaderProps) {
 
   return (
     <div className="space-y-4">
+      {/* Botón de Manual de Usuario — arriba e izquierda */}
+    <div className="flex justify-start">
+      <a
+        href="/manual_de_Usuario.pdf"
+        download="manual_de_Usuario.pdf"
+        className="px-4 py-2 bg-red-600 text-white rounded shadow hover:bg-red-700 transition"
+      >
+        Manual de Usuario 📄
+      </a>
+    </div>
+
       {/* Zona de carga */}
       <div
         onDragOver={handleDragOver}
@@ -361,6 +372,8 @@ export default function PdfUploader({ onResult = () => {} }: PdfUploaderProps) {
       <div className="card">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-lg font-semibold">Texto extraído del PDF</h3>
+ 
+
           {lastText && (
             <button
               onClick={() => {
