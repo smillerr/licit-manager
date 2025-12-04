@@ -13,7 +13,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "types": ["next-auth"],
+    "types": ["next-auth", "@types/jest"],
     "plugins": [
       {
         "name": "next"
@@ -31,9 +31,10 @@
   "include": [
     "next-env.d.ts",
     "**/*.ts",
-    "**/*.tsx","types/**/*.d.ts",
-    ".next/types/**/*.ts"
-, "app/page3/page.tsx"  ],
+    "**/*.tsx",
+    "types/**/*.d.ts",
+    ".next/types/**/*.ts",
+    "app/page3/page.tsx"
+  ],
   "exclude": ["node_modules"]
 }
- 

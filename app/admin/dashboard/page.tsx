@@ -131,11 +131,9 @@ export default function DashboardPage() {
         alert("Sample format uploaded successfully!");
       } else {
         const error = await response.json();
-        alert(`Upload failed: ${error.error}`);
       }
     } catch (error) {
       console.error("Upload error:", error);
-      alert("Upload failed. Please try again.");
     } finally {
       setUploading(false);
     }
