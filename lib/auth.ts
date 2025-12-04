@@ -1,11 +1,11 @@
-import { supabase } from '@/lib/supabaseClient';
-import NextAuth from "next-auth";
+import { NextAuthOptions } from "next-auth";
+import { supabase } from "@/lib/supabaseClient";
 import GoogleProvider from "next-auth/providers/google";
 import AzureADProvider from "next-auth/providers/azure-ad";
 import GitHubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 
-export default NextAuth({
+export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   providers: [
     GoogleProvider({
@@ -42,10 +42,10 @@ export default NextAuth({
 
         // Consultar usuario en Supabase
         const { data: user, error } = await supabase
-          .from('app_users')
-          .select('*')
-          .eq('email', email)
-          .eq('password', password) // NOTA: En producción usar bcrypt para comparar hashes
+          .from("app_users")
+          .select("*")
+          .eq("email", email)
+          .eq("password", password) // NOTA: En producción usar bcrypt para comparar hashes
           .single();
 
         if (error || !user) {
@@ -88,4 +88,4 @@ export default NextAuth({
   pages: {
     signIn: "/auth/login",
   },
-});
+};

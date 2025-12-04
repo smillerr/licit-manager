@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, memo } from 'react';
 import ExcelJS from 'exceljs';
+import { supabase } from '@/lib/supabaseClient';
 
 interface ExperienceField {
   id: string;
@@ -12,6 +13,7 @@ interface ExperienceField {
   required?: boolean;
   validation?: (value: string) => string | null;
   error?: string;
+  validation_type?: string; // Added to help with mapping
 }
 
 interface AutoCompleteConfig {
@@ -144,6 +146,13 @@ const validateRequired = (value: string): string | null => {
   return null;
 };
 
+const validationMap: Record<string, (value: string) => string | null> = {
+  'required': validateRequired,
+  'date': (value) => validateRequired(value) || validateDate(value),
+  'percentage': validatePercentage,
+  'number': (value) => validateRequired(value) || validateNumber(value),
+};
+
 export default function Page3() {
   const [fields, setFields] = useState<ExperienceField[]>([]);
   const [config, setConfig] = useState<AutoCompleteConfig>({
@@ -156,170 +165,86 @@ export default function Page3() {
   const [savedData, setSavedData] = useState<any[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Inicializar campos basados en el formato Excel
+  // Inicializar campos desde Supabase
   useEffect(() => {
-    const initialFields: ExperienceField[] = [
-      {
-        id: "numero_orden",
-        label: "No. de orden",
-        value: "",
-        autoCompleted: false,
-        suggestions: ["1", "2", "3", "4", "5"],
-        required: true,
-        validation: validateRequired
-      },
-      {
-        id: "numero_rup",
-        label: "Número consecutivo del reporte del contrato ejecutado en el RUP",
-        value: "",
-        autoCompleted: false,
-        suggestions: []
-      },
-      {
-        id: "experiencia_requerida",
-        label: "Experiencia requerida para la actividad principal",
-        value: "",
-        autoCompleted: false,
-        suggestions: ["Experiencia General", "Experiencia Específica"],
-        required: true,
-        validation: validateRequired
-      },
-      {
-        id: "entidad_contratante",
-        label: "Entidad contratante",
-        value: "",
-        autoCompleted: false,
-        suggestions: [],
-        required: true,
-        validation: validateRequired
-      },
-      {
-        id: "numero_contrato",
-        label: "Contrato o resolución - No.",
-        value: "",
-        autoCompleted: false,
-        suggestions: [],
-        required: true,
-        validation: validateRequired
-      },
-      {
-        id: "objeto_contrato",
-        label: "Contrato o resolución - Objeto",
-        value: "",
-        autoCompleted: false,
-        suggestions: [],
-        required: true,
-        validation: validateRequired
-      },
-      {
-        id: "clasificador_bienes",
-        label: "Contrato ejecutado identificado con el clasificador de bienes y servicios",
-        value: "",
-        autoCompleted: false,
-        suggestions: []
-      },
-      {
-        id: "forma_ejecucion",
-        label: "Formas de ejecución",
-        value: "",
-        autoCompleted: false,
-        suggestions: ["Individual (I)", "Consorcio (C)", "Unión Temporal (UT)", "OTRA"]
-      },
-      {
-        id: "porcentaje_participacion",
-        label: "Porcentaje de participación (%)",
-        value: "",
-        autoCompleted: false,
-        suggestions: ["100%", "50%", "30%", "25%"],
-        validation: validatePercentage
-      },
-      {
-        id: "integrante_experiencia",
-        label: "Integrante que aporta experiencia",
-        value: "",
-        autoCompleted: false,
-        suggestions: []
-      },
-      {
-        id: "fecha_iniciacion",
-        label: "Fecha de Iniciación [Dia-mes-año]",
-        value: "",
-        autoCompleted: false,
-        suggestions: [],
-        required: true,
-        validation: (value) => validateRequired(value) || validateDate(value)
-      },
-      {
-        id: "fecha_terminacion",
-        label: "Fecha de Terminación [Dia-mes-año]",
-        value: "",
-        autoCompleted: false,
-        suggestions: [],
-        required: true,
-        validation: (value) => validateRequired(value) || validateDate(value)
-      },
-      {
-        id: "valor_contrato_smmlv",
-        label: "Valor total del contrato en SMMLV",
-        value: "",
-        autoCompleted: false,
-        suggestions: [],
-        required: true,
-        validation: (value) => validateRequired(value) || validateNumber(value)
-      },
-      {
-        id: "valor_afectado_participacion",
-        label: "Valor total del contrato en SMMLV afectado por el porcentaje de participación",
-        value: "",
-        autoCompleted: false,
-        suggestions: []
-      },
-      {
-        id: "aplica_lotes",
-        label: "Aplica para lotes o grupos",
-        value: "",
-        autoCompleted: false,
-        suggestions: ["Lote 1", "Lote 2", "Lote 3", "Todos los lotes"]
+    async function loadFields() {
+      try {
+        const { data: dbFields, error } = await supabase
+          .from('form_fields')
+          .select('*')
+          .order('display_order');
+
+        if (error) throw error;
+
+        if (dbFields) {
+          const mappedFields: ExperienceField[] = dbFields.map((field: any) => ({
+            id: field.id,
+            label: field.label,
+            value: "",
+            autoCompleted: false,
+            suggestions: field.suggestions || [],
+            required: field.required,
+            validation: field.validation_type ? validationMap[field.validation_type] : undefined,
+            validation_type: field.validation_type
+          }));
+          setFields(mappedFields);
+        }
+      } catch (err) {
+        console.error('Error loading fields from Supabase:', err);
+        // Fallback or alert?
       }
-    ];
-    setFields(initialFields);
+    }
+    
+    loadFields();
   }, []);
 
-  // Simular datos de análisis previo (esto vendría de la página anterior)
+  // Simular datos de análisis previo (desde Supabase)
   useEffect(() => {
-    if (isInitialized) return;
+    if (isInitialized || fields.length === 0) return;
     
-    const mockAnalysisData = {
-      entidad_contratante: "CORPORACIÓN AUTÓNOMA REGIONAL DEL VALLE DEL CAUCA - CVC",
-      objeto_contrato: "Interventoría de obra pública de infraestructura social",
-      experiencia_requerida: "Experiencia Específica",
-      forma_ejecucion: "Individual (I)"
-    };
+    async function loadAnalysis() {
+      try {
+        const { data: analysisResults, error } = await supabase
+          .from('analysis_results')
+          .select('*');
 
-    const timer = setTimeout(() => {
-      setFields(prev => {
-        if (prev.length === 0) return prev;
-        
-        return prev.map(field => {
-          const suggestedValue = mockAnalysisData[field.id as keyof typeof mockAnalysisData];
-          if (suggestedValue && !field.value) {
-            return {
-              ...field,
-              value: suggestedValue,
-              autoCompleted: true,
-              suggestions: field.suggestions.includes(suggestedValue) 
-                ? field.suggestions 
-                : [suggestedValue, ...field.suggestions]
-            };
-          }
-          return field;
-        });
-      });
-      setIsInitialized(true);
-    }, 1000);
+        if (error) throw error;
 
-    return () => clearTimeout(timer);
-  }, [isInitialized]);
+        if (analysisResults) {
+          const mockAnalysisData: Record<string, string> = {};
+          analysisResults.forEach((item: any) => {
+            mockAnalysisData[item.field_id] = item.suggested_value;
+          });
+
+          // Simular delay como en el original
+          setTimeout(() => {
+            setFields(prev => {
+              return prev.map(field => {
+                const suggestedValue = mockAnalysisData[field.id];
+                if (suggestedValue && !field.value) {
+                  return {
+                    ...field,
+                    value: suggestedValue,
+                    autoCompleted: true,
+                    suggestions: field.suggestions.includes(suggestedValue) 
+                      ? field.suggestions 
+                      : [suggestedValue, ...field.suggestions]
+                  };
+                }
+                return field;
+              });
+            });
+            setIsInitialized(true);
+          }, 1000);
+        }
+      } catch (err) {
+        console.error('Error loading analysis results:', err);
+        setIsInitialized(true);
+      }
+    }
+
+    loadAnalysis();
+  }, [fields.length, isInitialized]);
 
   const handleFieldChange = useCallback((fieldId: string, value: string) => {
     setFields(prev => {
@@ -369,7 +294,7 @@ export default function Page3() {
     ));
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Validar todos los campos
     const fieldsWithErrors = fields.map(field => {
       if (field.required && !field.value) {
@@ -402,10 +327,21 @@ export default function Page3() {
       }, {} as Record<string, any>)
     };
 
-    setSavedData(prev => [...prev, formData]);
-    setSaved(true);
-    localStorage.setItem('formato3_experiencia', JSON.stringify(formData));
-    setTimeout(() => setSaved(false), 3000);
+    try {
+      const { error } = await supabase
+        .from('submitted_forms')
+        .insert([{ form_data: formData }]);
+
+      if (error) throw error;
+
+      setSavedData(prev => [...prev, formData]);
+      setSaved(true);
+      localStorage.setItem('formato3_experiencia', JSON.stringify(formData));
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      console.error('Error saving form to Supabase:', err);
+      alert('Error al guardar en la base de datos');
+    }
   };
 
   const downloadExcel = async () => {

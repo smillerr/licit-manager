@@ -1,13 +1,14 @@
-'use client';
-import { useCallback, useState } from 'react';
-import PdfUploader from '@/components/PdfUploader';
-import Link from 'next/link';
+"use client";
+import { useCallback, useState } from "react";
+import PdfUploader from "@/components/PdfUploader";
+import SampleFormats from "@/components/SampleFormats";
+import Link from "next/link";
 
 export default function Home() {
   const [showButton, setShowButton] = useState(false);
 
   const handleAnalysisResult = useCallback((text: string) => {
-    console.log('Texto extraído:', text);
+    console.log("Texto extraído:", text);
     // Aquí puedes agregar más lógica para procesar el resultado
     setShowButton(true); // Muestra el botón solo después de que se haya hecho el análisis
   }, []);
@@ -17,9 +18,12 @@ export default function Home() {
       <div className="mb-8">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">Licit Manager</h1>
         <p className="text-lg text-gray-600">
-          Analiza documentos de licitaciones con IA y extrae requisitos automáticamente
+          Analiza documentos de licitaciones con IA y extrae requisitos
+          automáticamente
         </p>
       </div>
+
+      <SampleFormats />
 
       <PdfUploader onResult={handleAnalysisResult} />
 
