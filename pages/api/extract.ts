@@ -3,6 +3,7 @@ import formidable, { Fields, Files } from 'formidable';
 import fs from 'fs';
 import path from 'path';
 import { processPdf } from '../../lib/pdfService';
+import { supabase } from '../../lib/supabaseClient';
 
 export const config = {
   api: { bodyParser: false },
@@ -26,6 +27,7 @@ interface ApiResponse {
     size: number;
     pages: number;
   };
+  fileUrl?: string; // URL pública del archivo en Supabase
   message?: string;
   error?: string;
   suggestion?: string;
@@ -81,8 +83,9 @@ export default async function handler(
 
     tempFilePath = file.filepath || file.path || '';
     const mimeType = file.mimetype || '';
+    const originalFilename = file.originalFilename || 'documento.pdf';
 
-    console.log('📁 Archivo recibido:', file.originalFilename, '- Tamaño:', file.size, 'bytes');
+    console.log('📁 Archivo recibido:', originalFilename, '- Tamaño:', file.size, 'bytes');
 
     // 1️⃣ Validar tipo MIME
     if (mimeType !== 'application/pdf') {
@@ -142,10 +145,36 @@ export default async function handler(
       });
     }
 
-    // 4️⃣ Procesar PDF
+    // 4️⃣ Procesar PDF (Extracción de texto)
     console.log('🔄 Iniciando extracción de texto...');
     const text = await processPdf(tempFilePath);
     
+    // 5️⃣ Subir archivo a Supabase Storage
+    console.log('☁️ Subiendo archivo a Supabase Storage...');
+    const fileContent = fs.readFileSync(tempFilePath);
+    const fileName = `${Date.now()}-${originalFilename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('licitaciones')
+      .upload(fileName, fileContent, {
+        contentType: 'application/pdf',
+        upsert: false
+      });
+
+    let publicUrl = '';
+
+    if (uploadError) {
+      console.error('⚠️ Error subiendo a Supabase:', uploadError.message);
+      // No fallamos toda la request, pero logueamos el error. El usuario tendrá el texto extraído igual.
+    } else {
+      const { data: publicUrlData } = supabase.storage
+        .from('licitaciones')
+        .getPublicUrl(fileName);
+      
+      publicUrl = publicUrlData.publicUrl;
+      console.log('✅ Archivo subido exitosamente:', publicUrl);
+    }
+
     // Limpiar archivo temporal después del procesamiento exitoso
     cleanTempFile(tempFilePath);
 
@@ -165,6 +194,7 @@ export default async function handler(
         size: file.size,
         pages: Math.ceil(lines / 50) // Estimación aproximada de páginas
       },
+      fileUrl: publicUrl,
       message: `Texto extraído exitosamente: ${words} palabras, ${lines} líneas`
     });
 
