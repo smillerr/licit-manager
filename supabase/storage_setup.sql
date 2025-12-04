@@ -19,7 +19,10 @@ ON storage.objects FOR INSERT
 WITH CHECK ( bucket_id = 'licitaciones' );
 
 -- Actualizar tabla de documentos para referencia al archivo
-ALTER TABLE documentos 
+ALTER TABLE documentos
 ADD COLUMN IF NOT EXISTS file_url TEXT,
 ADD COLUMN IF NOT EXISTS file_path TEXT;
+
+-- Políticas adicionales para sample-formats (si es necesario)
+-- Estas ya están cubiertas por las políticas generales del bucket
 
